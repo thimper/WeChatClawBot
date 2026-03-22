@@ -1,0 +1,53 @@
+{
+  "id": "molthuman-oc-plugin-wx",
+  "name": "MoltHuman Weixin Demo",
+  "description": "Single-package Weixin demo plugin with local control page.",
+  "channels": ["openclaw-weixin"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "enabled": {
+        "type": "boolean"
+      },
+      "baseUrl": {
+        "type": "string"
+      },
+      "cdnBaseUrl": {
+        "type": "string"
+      },
+      "routeTag": {
+        "type": "number"
+      },
+      "logUploadUrl": {
+        "type": "string"
+      },
+      "accounts": {
+        "type": "object"
+      },
+      "demoService": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "bind": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "restartCommand": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

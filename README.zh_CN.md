@@ -6,8 +6,6 @@
 
 微信 ClawBot 官方版一次只能一个微信扫码使用。WeClawBot-ex 解除了这个限制，并提供本地 Web 管理界面，统一管理所有接入的微信账号。
 
-<img src="./docs/weixin-claude-demo.jpg" alt="微信 ClawBot 聊天效果" width="320" />
-
 ## 相比官方 ClawBot 增加了什么
 
 | | 官方 ClawBot | WeClawBot-ex |
@@ -88,6 +86,12 @@ openclaw plugins install .
 - 新增本地 Web 管理界面（`src/service/`）
 - 每个微信账号独立会话隔离，互不干扰
 
+## 维护边界
+
+- 上游协议层和运行层视为冻结
+- 后续只继续迭代我们自己的部分：`src/service/`、插件包装层、安装文档
+- 除非遇到兼容性阻塞，否则不再修改上游派生文件
+
 ## 路线图
 
 - [ ] 群聊 @bot 模式
@@ -95,12 +99,12 @@ openclaw plugins install .
 - [ ] 扫码后热加载（无需重启 Gateway）
 - [ ] 对外分享二维码
 
-## 微信群
-
-扫码加入项目微信群：
-
-<img src="./docs/wechat-group-qr.jpg" alt="微信群二维码" width="280" />
-
 ## 许可证
 
 MIT — 详见 [LICENSE](./LICENSE) 和 [NOTICE](./NOTICE) 中的上游声明。
+
+## 微信交流群
+
+扫码加入微信 ClawBot 交流群：
+
+<img src="./docs/weclawbot-ex-wechat-group-qr.jpg" alt="WeClawBot-ex 微信交流群二维码" width="360" />

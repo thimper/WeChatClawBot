@@ -6,8 +6,6 @@ Multi-account extension for **WeChat ClawBot** (the official WeChat AI bot plugi
 
 The official ClawBot only supports one QR code and one user at a time. **WeClawBot-ex removes this limit** — multiple WeChat accounts can scan, log in, and chat with your AI agent simultaneously, all managed through a local web console.
 
-<img src="./docs/weixin-claude-demo.jpg" alt="WeChat ClawBot chat demo" width="320" />
-
 ## What This Adds Over the Official ClawBot
 
 | | Official ClawBot | WeClawBot-ex |
@@ -17,6 +15,10 @@ The official ClawBot only supports one QR code and one user at a time. **WeClawB
 | Channel status overview | None | Dashboard with live stats |
 | Cooldown diagnostics | None | `-14` errcode visibility |
 | Session isolation | Shared | Per-account-per-user |
+
+## Console Preview
+
+<img src="./docs/weclawbot-ex-console-preview.png" alt="WeClawBot-ex console preview" width="980" />
 
 ## Quick Start
 
@@ -88,6 +90,12 @@ WeChat User C ──┘         |
 - Adds a local web console (`src/service/`) for visual channel management
 - Each WeChat account gets isolated DM sessions — no cross-talk
 
+## Maintenance Boundary
+
+- The upstream protocol/runtime layer is treated as frozen
+- Ongoing changes should stay in our own layer: `src/service/`, plugin packaging, and docs
+- Avoid editing upstream-derived files unless a compatibility fix is unavoidable
+
 ## Roadmap
 
 - [ ] Group chat (@bot mode)
@@ -95,12 +103,12 @@ WeChat User C ──┘         |
 - [ ] Hot-reload after scan (no gateway restart)
 - [ ] Shareable QR codes for external distribution
 
-## WeChat Group
-
-Scan to join the project WeChat group:
-
-<img src="./docs/wechat-group-qr.jpg" alt="WeChat group QR" width="280" />
-
 ## License
 
 MIT — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE) for upstream attribution.
+
+## WeChat Group
+
+Scan the QR code below to join the WeChat ClawBot exchange group:
+
+<img src="./docs/weclawbot-ex-wechat-group-qr.jpg" alt="WeClawBot-ex WeChat group QR" width="360" />

@@ -1,0 +1,23 @@
+{
+  "name": "wxclawbot-cc-codex",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Standalone Weixin gateway for Claude Code style backends",
+  "type": "module",
+  "bin": {
+    "wxclawbot-cc-codex": "./src/cli.mjs"
+  },
+  "scripts": {
+    "accounts": "node ./src/cli.mjs accounts",
+    "login": "node ./src/cli.mjs login",
+    "dev": "node ./src/cli.mjs",
+    "start": "node ./src/cli.mjs",
+    "type-check": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

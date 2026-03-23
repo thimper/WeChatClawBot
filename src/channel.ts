@@ -263,7 +263,10 @@ export const weixinPlugin: ChannelPlugin<ResolvedWeixinAccount> = {
             userId: waitResult.userId,
           });
           registerWeixinAccountId(normalizedId);
-          void triggerWeixinChannelReload();
+          const reload = await triggerWeixinChannelReload();
+          if (!reload.ok) {
+            log(`⚠️  自动刷新通道失败，请手动执行: openclaw gateway restart`);
+          }
           log(`\n✅ 与微信连接成功！`);
         } catch (err) {
           logger.error(
@@ -363,8 +366,10 @@ export const weixinPlugin: ChannelPlugin<ResolvedWeixinAccount> = {
             userId: result.userId,
           });
           registerWeixinAccountId(normalizedId);
-          triggerWeixinChannelReload();
-          logger.info(`loginWithQrWait: saved account data for accountId=${normalizedId}`);
+          const reload = await triggerWeixinChannelReload();
+          logger.info(
+            `loginWithQrWait: saved account data for accountId=${normalizedId} reloadMode=${reload.mode} triggered=${reload.triggered}`,
+          );
         } catch (err) {
           logger.error(`loginWithQrWait: failed to save account data err=${String(err)}`);
         }

@@ -75,8 +75,9 @@ openclaw plugins install .
 1. 启动 OpenClaw Gateway
 2. 打开 **http://127.0.0.1:19120/**
 3. 点击 **添加微信渠道** — 用微信扫码并在手机上确认
-4. 扫码成功后重启 Gateway
-5. 用该微信发一条消息 — AI 智能体自动回复
+4. 扫码成功后等待几秒，插件会尝试自动刷新微信通道
+5. 如果新账号仍然没有上线，再执行 `openclaw gateway restart`
+6. 用该微信发一条消息 — AI 智能体自动回复
 
 每添加一个微信号，重复第 3 步即可。
 
@@ -87,6 +88,7 @@ openclaw plugins install .
 - 先检查 `node -v`。当前插件要求 Node.js `>= 22`。
 - 再检查 `openclaw --version`。过旧的 OpenClaw 版本可能和当前插件不兼容。
 - 如果插件安装成功但管理端没起来，先确认 `channels.openclaw-weixin.demoService.enabled=true`，然后重启 Gateway。
+- 如果扫码已经成功，但新账号还是收不到消息，先等自动刷新完成；还不行再使用诊断面板里的手动重启命令。
 
 ## 工作原理
 
@@ -114,7 +116,7 @@ openclaw plugins install .
 
 - [ ] 群聊 @bot 模式
 - [ ] 媒体消息支持（图片、文件、语音）
-- [ ] 扫码后热加载（无需重启 Gateway）
+- [ ] 精确到单账号的热启动（不再依赖 channel 级 reload）
 - [ ] 对外分享二维码
 
 ## 许可证

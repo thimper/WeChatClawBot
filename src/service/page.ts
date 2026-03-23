@@ -523,7 +523,7 @@ export function renderDemoPage(): string {
           <span>正在等待生成二维码</span>
         </div>
         <div id="session-meta" class="tip">
-          <strong>提示：</strong> 扫码成功后，请重启网关，并让这个微信先发第一句话。
+          <strong>提示：</strong> 扫码成功后会优先自动刷新微信通道；若失败，再手动重启网关。
         </div>
       </article>
     </dialog>
@@ -538,7 +538,7 @@ export function renderDemoPage(): string {
           <button id="close-diagnostics-modal" class="close" type="button">×</button>
         </div>
         <div class="tip">
-          <strong>网关操作：</strong> 这里保留重启命令和技术日志，方便排查。
+          <strong>网关操作：</strong> 这里保留自动刷新状态、兜底重启命令和技术日志，方便排查。
         </div>
         <div id="restart-command" class="command-box">openclaw gateway restart</div>
         <div id="diagnostic-list" class="diagnostic-list">
@@ -564,6 +564,13 @@ export function renderDemoPage(): string {
       let cachedAccounts = null;
       let cachedErrors = null;
       let cachedHealth = null;
+      let restartState = {
+        mode: "manual",
+        available: false,
+        command: "openclaw gateway restart",
+        message: "当前环境需要手动重启 Gateway。",
+        reason: "",
+      };
       const runtimeCatalog = {
         "openclaw": true,
         "codex": false,
@@ -609,6 +616,48 @@ export function renderDemoPage(): string {
         document.getElementById("menu").removeAttribute("open");
       }
 
+      function syncRestartState(next) {
+        restartState = {
+          mode: next && next.mode ? String(next.mode) : "manual",
+          available: Boolean(next && next.available),
+          command: next && next.command ? String(next.command) : "openclaw gateway restart",
+          message: next && next.message ? String(next.message) : "当前环境需要手动重启 Gateway。",
+          reason: next && next.reason ? String(next.reason) : "",
+        };
+      }
+
+      function buildPostScanTip() {
+        if (restartState.mode === "auto" && restartState.available) {
+          return "扫码成功后会自动刷新微信通道。等待几秒后，让这个微信先发第一句话。";
+        }
+        return "扫码成功后，请手动重启网关，并让这个微信先发第一句话。";
+      }
+
+      function buildRestartPanelText() {
+        const sessionScopeText =
+          cachedHealth && cachedHealth.session && cachedHealth.session.dmScope
+            ? ("当前会话隔离模式：dmScope=" + String(cachedHealth.session.dmScope))
+            : "当前会话隔离模式：未读取到 dmScope";
+
+        if (restartState.mode === "auto" && restartState.available) {
+          return "自动刷新：已启用\\n" +
+            restartState.message +
+            "\\n兜底命令：" +
+            restartState.command +
+            "\\n" +
+            sessionScopeText;
+        }
+
+        const reasonText = restartState.reason ? ("\\n原因：" + restartState.reason) : "";
+        return "自动刷新：不可用\\n" +
+          restartState.message +
+          reasonText +
+          "\\n手动命令：" +
+          restartState.command +
+          "\\n" +
+          sessionScopeText;
+      }
+
       function toStatusCopy(status) {
         if (status === "scanned") {
           return {
@@ -619,7 +668,7 @@ export function renderDemoPage(): string {
         if (status === "confirmed") {
           return {
             title: "接入成功",
-            detail: "下一步请重启网关，然后让该微信先发第一句话。",
+            detail: buildPostScanTip(),
           };
         }
         if (status === "expired") {
@@ -685,7 +734,9 @@ export function renderDemoPage(): string {
 
         if (select.value === "openclaw") {
           runtimeStatus.className = openclawOnline ? "badge" : "badge danger";
-          runtimeStatus.textContent = openclawOnline ? "在线" : "离线";
+          runtimeStatus.textContent = openclawOnline
+            ? (restartState.mode === "auto" && restartState.available ? "在线 · 自动刷新" : "在线 · 手动刷新")
+            : "离线";
           return;
         }
 
@@ -806,9 +857,16 @@ export function renderDemoPage(): string {
           body: JSON.stringify(payload),
         }));
         activeSessionKey = data.sessionKey || null;
+        if (cachedHealth && cachedHealth.restart) {
+          syncRestartState(cachedHealth.restart);
+        }
         renderQr(data.qrcodeUrl, data.qrImageDataUrl);
         setSessionStatus(data.status || "waiting", data.message, data.sessionKey);
-        setSessionMeta(activeSessionKey ? ("当前扫码会话：" + activeSessionKey) : "当前没有进行中的扫码会话。");
+        setSessionMeta(
+          activeSessionKey
+            ? ("当前扫码会话：" + activeSessionKey + "。 " + buildPostScanTip())
+            : "当前没有进行中的扫码会话。",
+        );
         openDialog("channel-modal");
         if (activeSessionKey) {
           startPolling();
@@ -821,12 +879,19 @@ export function renderDemoPage(): string {
         }
         try {
           const data = await readJson(await fetch("/api/qr/" + encodeURIComponent(activeSessionKey) + "/status"));
+          if (data.activation) {
+            syncRestartState(data.activation);
+          }
           renderQr(data.qrcodeUrl, data.qrImageDataUrl);
           setSessionStatus(data.status, data.message, data.accountId || activeSessionKey);
           if (data.status === "confirmed") {
             stopPolling();
             activeSessionKey = null;
-            setSessionMeta("接入成功。稍后关闭此窗口，并让该微信先发第一句话。");
+            setSessionMeta(
+              data.activation && data.activation.mode === "auto" && data.activation.available
+                ? "接入成功。自动刷新请求已发送，等待几秒后让该微信先发第一句话。"
+                : "接入成功，但自动刷新没有生效。请手动重启网关，再让该微信先发第一句话。",
+            );
             await refreshDashboard();
             setTimeout(() => closeDialog("channel-modal"), 900);
           } else if (data.status === "expired" || data.status === "failed") {
@@ -862,18 +927,12 @@ export function renderDemoPage(): string {
         cachedHealth = health;
         cachedAccounts = accounts;
         cachedErrors = errors;
+        syncRestartState(health.restart || {});
         renderSummary(accounts);
         renderHealth(health, Array.isArray(accounts.diagnostics) ? accounts.diagnostics.length : 0);
         renderChannels(accounts);
         renderDiagnostics(accounts, errors);
-        const restartCommand = health.restart && health.restart.command
-          ? String(health.restart.command)
-          : "openclaw gateway restart";
-        const sessionScopeText = health.session && health.session.dmScope
-          ? ("当前会话隔离模式：dmScope=" + String(health.session.dmScope))
-          : "当前会话隔离模式：未读取到 dmScope";
-        document.getElementById("restart-command").textContent =
-          restartCommand + "\\n" + sessionScopeText;
+        document.getElementById("restart-command").textContent = buildRestartPanelText();
       }
 
       document.getElementById("add-channel").addEventListener("click", () => {
@@ -900,13 +959,8 @@ export function renderDemoPage(): string {
       document.getElementById("menu-restart").addEventListener("click", async () => {
         closeMenu();
         const data = await readJson(await fetch("/api/gateway/restart", { method: "POST" }));
-        const restartCommand = data.command ? String(data.command) : "openclaw gateway restart";
-        const sessionScopeText =
-          cachedHealth && cachedHealth.session && cachedHealth.session.dmScope
-            ? ("当前会话隔离模式：dmScope=" + String(cachedHealth.session.dmScope))
-            : "当前会话隔离模式：未读取到 dmScope";
-        document.getElementById("restart-command").textContent =
-          restartCommand + "\\n" + sessionScopeText;
+        syncRestartState(data);
+        document.getElementById("restart-command").textContent = buildRestartPanelText();
         openDialog("diagnostics-modal");
       });
 

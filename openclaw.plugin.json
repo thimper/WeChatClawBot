@@ -45,6 +45,9 @@
           },
           "restartCommand": {
             "type": "string"
+          },
+          "reloadNonce": {
+            "type": "string"
           }
         }
       }

@@ -11,6 +11,15 @@ import { logger } from "../util/logger.js";
 export const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com";
 export const CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c";
 
+export type WeixinChannelReloadResult = {
+  mode: "auto" | "manual";
+  ok: boolean;
+  triggered: boolean;
+  configPath?: string;
+  reason?: string;
+  message: string;
+};
+
 
 // ---------------------------------------------------------------------------
 // Account ID compatibility (legacy raw ID → normalized ID)
@@ -186,12 +195,62 @@ export function clearWeixinAccount(accountId: string): void {
 
 /**
  * Resolve the openclaw.json config file path.
- * Checks OPENCLAW_CONFIG env var, then state dir.
+ * Checks OPENCLAW_CONFIG_PATH / OPENCLAW_CONFIG env vars, then state dir.
  */
 function resolveConfigPath(): string {
-  const envPath = process.env.OPENCLAW_CONFIG?.trim();
+  const envPath = process.env.OPENCLAW_CONFIG_PATH?.trim() || process.env.OPENCLAW_CONFIG?.trim();
   if (envPath) return envPath;
   return path.join(resolveStateDir(), "openclaw.json");
+}
+
+function buildManualReloadResult(reason: string, configPath?: string): WeixinChannelReloadResult {
+  return {
+    mode: "manual",
+    ok: false,
+    triggered: false,
+    configPath,
+    reason,
+    message: `Auto reload unavailable: ${reason}`,
+  };
+}
+
+function writeConfigJsonAtomic(configPath: string, value: Record<string, unknown>): void {
+  const dir = path.dirname(configPath);
+  fs.mkdirSync(dir, { recursive: true });
+  const tempPath = path.join(
+    dir,
+    `.openclaw-weixin-reload-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.tmp`,
+  );
+  fs.writeFileSync(tempPath, `${JSON.stringify(value, null, 2)}\n`, "utf-8");
+  fs.renameSync(tempPath, configPath);
+}
+
+export function getWeixinChannelReloadStatus(): WeixinChannelReloadResult {
+  const configPath = resolveConfigPath();
+  if (!configPath) {
+    return buildManualReloadResult("config path is missing");
+  }
+  if (!fs.existsSync(configPath)) {
+    return buildManualReloadResult("config file was not found", configPath);
+  }
+  try {
+    fs.accessSync(configPath, fs.constants.R_OK | fs.constants.W_OK);
+  } catch {
+    return buildManualReloadResult("config file is not writable", configPath);
+  }
+  try {
+    JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  } catch {
+    return buildManualReloadResult("config file is not valid JSON", configPath);
+  }
+
+  return {
+    mode: "auto",
+    ok: true,
+    triggered: false,
+    configPath,
+    message: "Auto reload is available for channels.openclaw-weixin.",
+  };
 }
 
 /**
@@ -224,9 +283,61 @@ export function loadConfigRouteTag(accountId?: string): string | undefined {
 }
 
 /**
- * No-op stub — config reload is now handled externally via `openclaw gateway restart`.
+ * Touches the channel config subtree to trigger OpenClaw's config watcher.
+ * Falls back to manual restart when the active config file cannot be updated.
  */
-export async function triggerWeixinChannelReload(): Promise<void> {}
+export async function triggerWeixinChannelReload(): Promise<WeixinChannelReloadResult> {
+  const status = getWeixinChannelReloadStatus();
+  if (!status.ok || !status.configPath) {
+    logger.warn(`[reload] ${status.message}`);
+    return status;
+  }
+
+  try {
+    const raw = fs.readFileSync(status.configPath, "utf-8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const channels =
+      parsed.channels && typeof parsed.channels === "object" ? parsed.channels : {};
+    const section =
+      (channels as Record<string, unknown>)["openclaw-weixin"] &&
+      typeof (channels as Record<string, unknown>)["openclaw-weixin"] === "object"
+        ? ((channels as Record<string, unknown>)["openclaw-weixin"] as Record<string, unknown>)
+        : {};
+    const demoService =
+      section.demoService && typeof section.demoService === "object"
+        ? (section.demoService as Record<string, unknown>)
+        : {};
+
+    const next = {
+      ...parsed,
+      channels: {
+        ...(channels as Record<string, unknown>),
+        "openclaw-weixin": {
+          ...section,
+          demoService: {
+            ...demoService,
+            reloadNonce: new Date().toISOString(),
+          },
+        },
+      },
+    } satisfies Record<string, unknown>;
+
+    writeConfigJsonAtomic(status.configPath, next);
+
+    const result: WeixinChannelReloadResult = {
+      ...status,
+      triggered: true,
+      message: "Channel reload requested via channels.openclaw-weixin.demoService.reloadNonce.",
+    };
+    logger.info(`[reload] ${result.message}`);
+    return result;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    const result = buildManualReloadResult(reason, status.configPath);
+    logger.warn(`[reload] ${result.message}`);
+    return result;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Account resolution (merge config + stored credentials)

@@ -79,8 +79,9 @@ Add to your OpenClaw config (`openclaw config edit`):
 1. Start your OpenClaw Gateway
 2. Open **http://127.0.0.1:19120/**
 3. Click **Add WeChat Channel** — scan the QR code with WeChat
-4. Restart Gateway after scan success
-5. Send a message from that WeChat account — your AI agent replies
+4. After scan success, wait a few seconds for auto refresh
+5. If the new account still does not come online, run `openclaw gateway restart`
+6. Send a message from that WeChat account — your AI agent replies
 
 Repeat step 3 for each additional WeChat account.
 
@@ -91,6 +92,7 @@ Repeat step 3 for each additional WeChat account.
 - Check `node -v` first. This plugin requires Node.js `>= 22`.
 - Check `openclaw --version` next. Older OpenClaw builds may be incompatible with this plugin revision.
 - If the plugin installs but the console does not open, verify `channels.openclaw-weixin.demoService.enabled=true` and restart Gateway.
+- If QR login succeeds but the new account does not receive messages, first wait for auto refresh, then use the manual restart command shown in the diagnostics panel.
 
 ## How It Works
 
@@ -118,7 +120,7 @@ WeChat User C ──┘         |
 
 - [ ] Group chat (@bot mode)
 - [ ] Media message support (images, files, voice)
-- [ ] Hot-reload after scan (no gateway restart)
+- [ ] Precise account hot-start without channel-level reload
 - [ ] Shareable QR codes for external distribution
 
 ## License

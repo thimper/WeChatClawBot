@@ -29,6 +29,7 @@ const DemoServiceSchema = z.object({
   bind: z.string().optional(),
   port: z.number().int().min(1).max(65535).optional(),
   restartCommand: z.string().optional(),
+  reloadNonce: z.string().optional(),
 });
 
 export const WeixinDemoPluginConfigSchema = WeixinConfigSchema.extend({

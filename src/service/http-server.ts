@@ -5,9 +5,11 @@ import type { PluginLogger } from "openclaw/plugin-sdk/core";
 
 import {
   DEFAULT_BASE_URL,
+  getWeixinChannelReloadStatus,
   loadWeixinAccount,
   registerWeixinAccountId,
   saveWeixinAccount,
+  triggerWeixinChannelReload,
 } from "../auth/accounts.js";
 import {
   DEFAULT_ILINK_BOT_TYPE,
@@ -83,6 +85,7 @@ export class WeixinDemoHttpServer {
       }
       if (req.method === "GET" && url.pathname === "/api/health") {
         const snapshot = buildDemoAccountsSnapshot(this.config);
+        const reload = getWeixinChannelReloadStatus();
         this.respondJson(res, 200, {
           ok: true,
           gateway: {
@@ -99,8 +102,13 @@ export class WeixinDemoHttpServer {
             pageUrl: `http://${this.serviceConfig.bind}:${this.serviceConfig.port}/`,
           },
           restart: {
-            mode: "manual",
+            mode: reload.mode,
+            available: reload.ok,
             command: this.serviceConfig.restartCommand,
+            message: reload.ok
+              ? "扫码成功后会自动刷新微信通道。"
+              : "当前环境无法自动刷新微信通道，请手动重启 Gateway。",
+            reason: reload.reason,
           },
         });
         return;
@@ -143,6 +151,13 @@ export class WeixinDemoHttpServer {
             userId: result.userId,
           });
           registerWeixinAccountId(normalizedId);
+          const activation = await triggerWeixinChannelReload();
+          this.respondJson(res, 200, {
+            ...result,
+            activation,
+            qrImageDataUrl: result.qrcodeUrl ? renderQrImageDataUrl(result.qrcodeUrl) : undefined,
+          });
+          return;
         }
         this.respondJson(res, 200, {
           ...result,
@@ -188,10 +203,15 @@ export class WeixinDemoHttpServer {
       }
 
       if (req.method === "POST" && url.pathname === "/api/gateway/restart") {
+        const reload = getWeixinChannelReloadStatus();
         this.respondJson(res, 200, {
-          mode: "manual",
+          mode: reload.mode,
+          available: reload.ok,
           command: this.serviceConfig.restartCommand,
-          message: "Run the restart command after scan success.",
+          message: reload.ok
+            ? "Auto reload is enabled. Use this command only if the new account does not come online."
+            : "Run the restart command after scan success.",
+          reason: reload.reason,
         });
         return;
       }

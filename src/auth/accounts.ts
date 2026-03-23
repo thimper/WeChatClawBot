@@ -197,7 +197,7 @@ export function clearWeixinAccount(accountId: string): void {
  * Resolve the openclaw.json config file path.
  * Checks OPENCLAW_CONFIG_PATH / OPENCLAW_CONFIG env vars, then state dir.
  */
-function resolveConfigPath(): string {
+export function resolveConfigPath(): string {
   const envPath = process.env.OPENCLAW_CONFIG_PATH?.trim() || process.env.OPENCLAW_CONFIG?.trim();
   if (envPath) return envPath;
   return path.join(resolveStateDir(), "openclaw.json");

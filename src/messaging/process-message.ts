@@ -5,11 +5,11 @@ import type { PluginRuntime } from "openclaw/plugin-sdk";
 import {
   createTypingCallbacks,
   resolveDirectDmAuthorizationOutcome,
+  resolvePreferredOpenClawTmpDir,
   resolveSenderCommandAuthorizationWithRuntime,
 } from "openclaw/plugin-sdk";
-import {
-  sendTyping,
-} from "../api/api.js";
+
+import { sendTyping } from "../api/api.js";
 import type { WeixinMessage } from "../api/types.js";
 import { MessageItemType, TypingStatus } from "../api/types.js";
 import { loadWeixinAccount } from "../auth/accounts.js";

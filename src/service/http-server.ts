@@ -1,3 +1,4 @@
+import { exec } from "node:child_process";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 import { normalizeAccountId } from "openclaw/plugin-sdk";
@@ -10,6 +11,7 @@ import {
   registerWeixinAccountId,
   saveWeixinAccount,
 } from "../auth/accounts.js";
+import { listAvailableAgents, provisionAgentForAccount } from "../auth/auto-provision.js";
 import {
   DEFAULT_ILINK_BOT_TYPE,
   getWeixinLoginSnapshot,
@@ -30,6 +32,9 @@ type HttpServerDeps = {
   logger: PluginLogger;
   config: import("openclaw/plugin-sdk/core").OpenClawConfig;
 };
+
+/** Temporary map: sessionKey → selected agentId for workspace provisioning. */
+const sessionAgentMap = new Map<string, string>();
 
 export class WeixinDemoHttpServer {
   private readonly logger: PluginLogger;
@@ -127,10 +132,16 @@ export class WeixinDemoHttpServer {
         });
         return;
       }
+      if (req.method === "GET" && url.pathname === "/api/agents") {
+        this.respondJson(res, 200, { agents: listAvailableAgents() });
+        return;
+      }
       if (req.method === "POST" && url.pathname === "/api/qr/create") {
         const body = await this.readJsonBody(req);
         const accountId =
           typeof body.accountId === "string" && body.accountId.trim() ? body.accountId.trim() : undefined;
+        const selectedAgentId =
+          typeof body.agentId === "string" && body.agentId.trim() ? body.agentId.trim() : undefined;
         const savedBaseUrl = accountId ? loadWeixinAccount(accountId)?.baseUrl?.trim() : "";
         const result = await startWeixinLoginWithQr({
           accountId,
@@ -138,6 +149,9 @@ export class WeixinDemoHttpServer {
           botType: DEFAULT_ILINK_BOT_TYPE,
           force: true,
         });
+        if (selectedAgentId && result.sessionKey) {
+          sessionAgentMap.set(result.sessionKey, selectedAgentId);
+        }
         const snapshot = getWeixinLoginSnapshot(result.sessionKey);
         this.respondJson(res, 200, {
           ok: Boolean(result.qrcodeUrl),
@@ -165,18 +179,18 @@ export class WeixinDemoHttpServer {
             userId: result.userId,
           });
           registerWeixinAccountId(normalizedId);
-          const binding = await resolveOrRegisterWeixinUserAgent({
-            userId: result.userId,
-            accountId: normalizedId,
-            config: this.config,
-          });
-          this.respondJson(res, 200, {
-            ...result,
-            binding,
-            activation: binding.activation,
-            qrImageDataUrl: result.qrcodeUrl ? await renderQrImageDataUrl(result.qrcodeUrl) : undefined,
-          });
-          return;
+          const selectedAgent = sessionAgentMap.get(sessionKey);
+          sessionAgentMap.delete(sessionKey);
+          provisionAgentForAccount(normalizedId, selectedAgent);
+          // Auto-restart gateway after 3s to load the new account
+          setTimeout(() => {
+            this.logger.info("[molthuman-oc-plugin-wx] auto-restarting gateway to load new account");
+            exec("openclaw gateway restart", (err, stdout, stderr) => {
+              if (err) {
+                this.logger.error(`[molthuman-oc-plugin-wx] auto-restart failed: ${err.message}`);
+              }
+            });
+          }, 3000);
         }
         this.respondJson(res, 200, {
           ...result,

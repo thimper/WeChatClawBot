@@ -1,5 +1,7 @@
 # WeClawBot-ex
 
+> Fork 自 [ImGoodBai/WeClawBot-ex](https://github.com/ImGoodBai/WeClawBot-ex)
+
 [English](./README.md)
 
 **微信 ClawBot 多账号管理增强层** — 让微信 ClawBot 更适合多微信接入、统一管理和后续对外分发。

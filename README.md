@@ -1,5 +1,7 @@
 # WeClawBot-ex
 
+> Forked from [ImGoodBai/WeClawBot-ex](https://github.com/ImGoodBai/WeClawBot-ex)
+
 [简体中文](./README.zh_CN.md)
 
 Multi-account management layer for **WeChat ClawBot** (the official WeChat AI bot plugin by Tencent).

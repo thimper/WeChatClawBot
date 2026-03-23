@@ -1,3 +1,4 @@
+import { encodePngRgba, fillPixel } from "../util/png-encode.js";
 import QRCodeModule from "qrcode-terminal/vendor/QRCode/index.js";
 import QRErrorCorrectLevelModule from "qrcode-terminal/vendor/QRCode/QRErrorCorrectLevel.js";
 

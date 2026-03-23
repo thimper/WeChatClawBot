@@ -5,6 +5,7 @@ import type { PluginRuntime } from "openclaw/plugin-sdk";
 import {
   createTypingCallbacks,
   resolveDirectDmAuthorizationOutcome,
+  resolvePreferredOpenClawTmpDir,
   resolveSenderCommandAuthorizationWithRuntime,
 } from "openclaw/plugin-sdk";
 import {

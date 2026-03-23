@@ -515,12 +515,23 @@ export function renderDemoPage(): string {
           </div>
           <button id="close-channel-modal" class="close" type="button">×</button>
         </div>
+        <div class="workspace-select" style="margin-top:14px;">
+          <label for="workspace-agent" style="display:block;color:var(--muted);font-size:13px;margin-bottom:6px;">选择工作区</label>
+          <select id="workspace-agent" style="width:100%;padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:#fffdf8;color:var(--text);font:inherit;">
+            <option value="main">默认工作区</option>
+            <option value="__new__">+ 创建新工作区</option>
+          </select>
+          <div id="workspace-name-wrap" style="display:none;margin-top:10px;">
+            <input id="workspace-name" type="text" placeholder="输入工作区名称，如：客服、营销" style="width:100%;padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:#fffdf8;color:var(--text);font:inherit;box-sizing:border-box;" />
+          </div>
+          <button id="generate-qr" class="primary" type="button" style="margin-top:10px;width:100%;">生成二维码</button>
+        </div>
         <div id="session-status" class="status-box waiting">
-          <strong>当前没有进行中的扫码会话</strong>
-          <small>点击“添加微信”后，这里会显示等待扫码、已扫码、已确认或已过期状态。</small>
+          <strong>选择工作区后，点击上方按钮生成二维码</strong>
+          <small>生成二维码后，使用微信扫描完成接入。</small>
         </div>
         <div id="qr-wrap" class="qr-wrap">
-          <span>正在等待生成二维码</span>
+          <span>选择工作区后点击生成二维码</span>
         </div>
         <div id="session-meta" class="tip">
           <strong>提示：</strong> 扫码成功后会优先自动刷新微信通道；若失败，再手动重启网关。
@@ -674,7 +685,7 @@ export function renderDemoPage(): string {
         if (status === "expired") {
           return {
             title: "二维码已过期",
-            detail: "重新点击“添加微信”生成新二维码。",
+            detail: "重新点击「添加微信」生成新二维码。",
           };
         }
         if (status === "failed") {
@@ -756,7 +767,7 @@ export function renderDemoPage(): string {
         if (!Array.isArray(snapshot.channels) || snapshot.channels.length === 0) {
           el.innerHTML = '<div class="empty-card"><div><h3>扫码登录第一个微信</h3><p>登录完成后，这个机器人就可以同时被多个微信使用。这里会显示每个微信的状态和历史登录。</p><div class="channel-actions" style="justify-content:center;"><button id="add-first-channel-inline" class="primary" type="button">立即添加</button></div></div></div>';
           document.getElementById("add-first-channel-inline").addEventListener("click", () => {
-            void createQr();
+            void openQrModal();
           });
           return;
         }
@@ -809,7 +820,7 @@ export function renderDemoPage(): string {
         }).join("");
         el.querySelectorAll("[data-relogin]").forEach((button) => {
           button.addEventListener("click", () => {
-            void createQr(button.getAttribute("data-relogin"));
+            void openQrModal(button.getAttribute("data-relogin"));
           });
         });
       }
@@ -858,8 +869,51 @@ export function renderDemoPage(): string {
         }
       }
 
+      function buildAgentOptions(defaultAgentId) {
+        var channels = cachedAccounts && Array.isArray(cachedAccounts.channels) ? cachedAccounts.channels : [];
+        var seen = new Set();
+        var options = [];
+        // Always include "main" as default workspace
+        seen.add("main");
+        options.push('<option value="main"' + (defaultAgentId === "main" || !defaultAgentId ? ' selected' : '') + '>默认工作区 (main)</option>');
+        // Add known agent IDs from existing channels
+        channels.forEach(function(ch) {
+          if (ch.agentId && !seen.has(ch.agentId)) {
+            seen.add(ch.agentId);
+            options.push('<option value="' + escapeHtml(ch.agentId) + '"' + (defaultAgentId === ch.agentId ? ' selected' : '') + '>' + escapeHtml(ch.agentId) + '</option>');
+          }
+        });
+        options.push('<option value="__new__">+ 创建新工作区</option>');
+        return options.join("");
+      }
+
+      document.getElementById("workspace-agent").addEventListener("change", function() {
+        var wrap = document.getElementById("workspace-name-wrap");
+        var input = document.getElementById("workspace-name");
+        if (this.value === "__new__") {
+          wrap.style.display = "block";
+          input.focus();
+        } else {
+          wrap.style.display = "none";
+          input.value = "";
+        }
+      });
+
       async function createQr(accountId) {
-        const payload = accountId ? { accountId } : {};
+        var agentSelect = document.getElementById("workspace-agent");
+        var selectedAgent = agentSelect ? agentSelect.value : undefined;
+        var nameInput = document.getElementById("workspace-name");
+        var customName = nameInput ? nameInput.value.trim() : "";
+        nameInput.style.borderColor = "";
+        var payload = accountId ? { accountId } : {};
+        if (selectedAgent === "__new__") {
+          payload.agentId = "__new__";
+          if (customName) {
+            payload.agentName = customName;
+          }
+        } else if (selectedAgent) {
+          payload.agentId = selectedAgent;
+        }
         const data = await readJson(await fetch("/api/qr/create", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -946,12 +1000,37 @@ export function renderDemoPage(): string {
         document.getElementById("restart-command").textContent = buildRestartPanelText();
       }
 
+      let pendingReloginAccountId = null;
+
+      function findAgentIdForAccount(accountId) {
+        if (!accountId || !cachedAccounts || !Array.isArray(cachedAccounts.channels)) return null;
+        var ch = cachedAccounts.channels.find(function(c) { return c.primaryAccountId === accountId; });
+        return ch ? ch.agentId : null;
+      }
+
+      async function openQrModal(accountId) {
+        pendingReloginAccountId = accountId || null;
+        var previousAgentId = findAgentIdForAccount(accountId);
+        var select = document.getElementById("workspace-agent");
+        select.innerHTML = buildAgentOptions(previousAgentId);
+        document.getElementById("workspace-name-wrap").style.display = "none";
+        document.getElementById("workspace-name").value = "";
+        renderQr(null, null);
+        setSessionStatus("waiting", null, "");
+        document.getElementById("qr-wrap").innerHTML = "<span>选择工作区后点击生成二维码</span>";
+        openDialog("channel-modal");
+      }
+
+      document.getElementById("generate-qr").addEventListener("click", () => {
+        void createQr(pendingReloginAccountId);
+      });
+
       document.getElementById("add-channel").addEventListener("click", () => {
-        void createQr();
+        void openQrModal();
       });
 
       document.getElementById("add-first-channel").addEventListener("click", () => {
-        void createQr();
+        void openQrModal();
       });
 
       document.getElementById("close-channel-modal").addEventListener("click", () => {
